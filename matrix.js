@@ -1,34 +1,30 @@
-function log() {
-  for(var i=0,len=arguments.length; i<len; i++) {
-    var message = arguments[i];
-    if(message && message.toString) {
-      var s = message.toString();
-      if(s.indexOf("[object ") >= 0) {
-        s = JSON.stringify(message);
-      }
-      post(s);
-    }
-    else if(message === null) {
-      post("<null>");
-    }
-    else {
-      post(message);
-    }
-  }
-  post("\n");
-}
-
-function logApi(liveObject) {
-    log("         PATH:", liveObject.path);
-    log("               ID:", liveObject.id);
-    log("CHILDREN:", liveObject.children);
-}
- 
-log("___________________________________________________");
-log("Reload:", new Date);
-
 //--------------------------------------------------------------------
-// Helper functions
+// Utils
+
+function log() {
+    for (var i = 0, len = arguments.length; i < len; i++) {
+        var message = arguments[i];
+        if (message && message.toString) {
+            var s = message.toString();
+            if (s.indexOf("[object ") >= 0) {
+                s = JSON.stringify(message);
+            }
+            post(s);
+        }
+        else if (message === null) {
+            post("<null>");
+        }
+        else {
+            post(message);
+        }
+    }
+    post("\n");
+}
+
+function clear() {
+    log("___________________________________________________");
+    log("Reload:", new Date);
+}
 
 function toArray(data) {
     var array = [];
@@ -49,39 +45,46 @@ function removeFromArray(arr) {
     return arr;
 }
 
-function liveParse(data, unique) {
+//--------------------------------------------------------------------
+// Live
+
+var Live = new Object();
+
+Live.liveSet = new LiveAPI("live_set");
+Live.liveSetView = new LiveAPI("live_set view");
+
+Live.Log = function (liveObject) {
+    log("         PATH:", liveObject.path);
+    log("               ID:", liveObject.id);
+    log("CHILDREN:", liveObject.children);
+};
+
+Live.Parse = function (data, unique) {
     var parsed = removeFromArray(toArray(data), "id");
     if (unique && parsed.length == 1) {
         parsed = parsed[0];
     }
     return parsed;
+};
+
+Live.Env = function () {
+    return {
+        masterTrack: Live.Parse(Live.liveSet.get("master_track"), 1),
+        returnTracks: Live.Parse(Live.liveSet.get("return_tracks")),
+        tracks: Live.Parse(Live.liveSet.get("tracks")),
+        visibleTracks: Live.Parse(Live.liveSet.get("visible_tracks")),
+        selectedTrack: Live.Parse(Live.liveSetView.get("selected_track"), 1)
+    }
+};
+
+Live.GetAllTrackIds = function () {
+    return Live.Env().tracks.concat(Live.Env().returnTracks, Live.Env().masterTrack);
 }
 
-
-//--------------------------------------------------------------------
-// Track class
- 
-function Track() {
-    this.liveSet = new LiveAPI("live_set");
-    this.liveSetView = new LiveAPI("live_set view");
-
-    this.masterTrack = liveParse(this.liveSet.get("master_track"), 1);
-    this.returnTracks = liveParse(this.liveSet.get("return_tracks"));
-    this.tracks = liveParse(this.liveSet.get("tracks"));
-
-    this.visibleTracks = liveParse(this.liveSet.get("visible_tracks"));
-    this.selectedTrack = liveParse(this.liveSetView.get("selected_track"), 1);
-
-}
-  
-Track.prototype.GetAllTrackIds = function() {
-    return this.tracks.concat(this.returnTracks, this.masterTrack);    
-}
-
-Track.prototype.GetSelectedTrackIndex = function() {
-    if (this.selectedTrack) {
-        for (var i = 0; i < this.visibleTracks.length; i++) {
-            if (this.visibleTracks[i] == this.selectedTrack) {
+Live.GetSelectedTrackIndex = function () {
+    if (Live.Env().selectedTrack) {
+        for (var i = 0; i < Live.Env().visibleTracks.length; i++) {
+            if (Live.Env().visibleTracks[i] == Live.Env().selectedTrack) {
                 return i;
             }
         }
@@ -89,64 +92,65 @@ Track.prototype.GetSelectedTrackIndex = function() {
     return -1;
 }
 
-Track.prototype.GetVisibleTrackCount = function() {
-    return this.visibleTracks.length;
+Live.GetVisibleTrackCount = function () {
+    return Live.Env().visibleTracks.length;
 }
 
-Track.prototype.SelectMasterTrack = function() {
-    this.liveSetView.set("selected_track", "id", this.masterTrack);
+Live.SelectMasterTrack = function () {
+    Live.liveSetView.set("selected_track", "id", Live.Env().masterTrack);
 }
 
-Track.prototype.SelectNextTrack = function() {
-    var visibleTrackCount = this.GetVisibleTrackCount();
-    var selectedTrackIndex = this.GetSelectedTrackIndex();
+Live.SelectNextTrack = function () {
+    var visibleTrackCount = Live.GetVisibleTrackCount();
+    var selectedTrackIndex = Live.GetSelectedTrackIndex();
 
     if (visibleTrackCount > 0) {
         if (selectedTrackIndex == visibleTrackCount - 1) {
-            this.SelectMasterTrack();
+            Live.SelectMasterTrack();
         } else if (selectedTrackIndex >= 0 && selectedTrackIndex < visibleTrackCount - 1) {
-            this.SetSelectedTrackIndex(selectedTrackIndex + 1);
+            Live.SetSelectedTrackIndex(selectedTrackIndex + 1);
         } else {
-            this.SetSelectedTrackIndex(0);
+            Live.SetSelectedTrackIndex(0);
         }
     } else {
-        this.SelectMasterTrack();
+        Live.SelectMasterTrack();
     }
 }
 
-Track.prototype.SelectPreviousTrack = function() {
-    var visibleTrackCount = this.GetVisibleTrackCount();
-    var selectedTrackIndex = this.GetSelectedTrackIndex();
+Live.SelectPreviousTrack = function () {
+    var visibleTrackCount = Live.GetVisibleTrackCount();
+    var selectedTrackIndex = Live.GetSelectedTrackIndex();
 
     if (visibleTrackCount > 0) {
         if (selectedTrackIndex == 0) {
-            this.SelectMasterTrack();
+            Live.SelectMasterTrack();
         } else if (selectedTrackIndex > 0 && selectedTrackIndex < visibleTrackCount) {
-            this.SetSelectedTrackIndex(selectedTrackIndex - 1);
+            Live.SetSelectedTrackIndex(selectedTrackIndex - 1);
         } else {
-            this.SetSelectedTrackIndex(visibleTrackCount - 1);
+            Live.SetSelectedTrackIndex(visibleTrackCount - 1);
         }
     } else {
-        this.SelectMasterTrack();
+        Live.SelectMasterTrack();
     }
 }
 
-Track.prototype.SetSelectedTrackIndex = function(index) {
-    var visibleTrackCount = this.GetVisibleTrackCount();
+Live.SetSelectedTrackIndex = function (index) {
+    var visibleTrackCount = Live.GetVisibleTrackCount();
     if (index >= 0 && index < visibleTrackCount) {
-        this.liveSetView.set("selected_track", "id", this.visibleTracks[index]);
+        Live.liveSetView.set("selected_track", "id", Live.Env().visibleTracks[index]);
     }
 }
+
 
 //--------------------------------------------------------------------
 // Main
 
+clear();
+
 function nextTrack() {
-   var track = new Track();
-   track.SelectNextTrack();
+    Live.SelectNextTrack();
 }
 
 function previousTrack() {
-    var track = new Track();
-    track.SelectPreviousTrack();
+    Live.SelectPreviousTrack();
 }
