@@ -80,24 +80,24 @@ Live.Parse = function (data, unique) {
 
 Live.Env = function () {
     return {
-        masterTrack: Live.Parse(Live.LiveSet().get("master_track"), 1),
-        returnTracks: Live.Parse(Live.LiveSet().get("return_tracks")),
-        tracks: Live.Parse(Live.LiveSet().get("tracks")),
-        visibleTracks: Live.Parse(Live.LiveSet().get("visible_tracks")),
-        selectedTrack: Live.Parse(Live.LiveSetView().get("selected_track"), 1),
-        scenes: Live.Parse(Live.LiveSet().get("scenes")),
-        selectedScene: Live.Parse(Live.LiveSetView().get("selected_scene"), 1)
+        masterTrackId: Live.Parse(Live.LiveSet().get("master_track"), 1),
+        returnTrackIds: Live.Parse(Live.LiveSet().get("return_tracks")),
+        trackIds: Live.Parse(Live.LiveSet().get("tracks")),
+        visibleTrackIds: Live.Parse(Live.LiveSet().get("visible_tracks")),
+        selectedTrackId: Live.Parse(Live.LiveSetView().get("selected_track"), 1),
+        sceneIds: Live.Parse(Live.LiveSet().get("scenes")),
+        selectedSceneId: Live.Parse(Live.LiveSetView().get("selected_scene"), 1)
     };
 };
 
 Live.GetAllTrackIds = function () {
-    return Live.Env().tracks.concat(Live.Env().returnTracks, Live.Env().masterTrack);
+    return Live.Env().trackIds.concat(Live.Env().returnTrackIds, Live.Env().masterTrackId);
 };
 
 Live.GetSelectedTrackIndex = function () {
-    if (Live.Env().selectedTrack) {
-        for (var i = 0; i < Live.Env().visibleTracks.length; i++) {
-            if (Live.Env().visibleTracks[i] == Live.Env().selectedTrack) {
+    if (Live.Env().selectedTrackId) {
+        for (var i = 0; i < Live.Env().visibleTrackIds.length; i++) {
+            if (Live.Env().visibleTrackIds[i] == Live.Env().selectedTrackId) {
                 return i;
             }
         }
@@ -106,11 +106,11 @@ Live.GetSelectedTrackIndex = function () {
 };
 
 Live.GetVisibleTrackCount = function () {
-    return Live.Env().visibleTracks.length;
+    return Live.Env().visibleTrackIds.length;
 };
 
 Live.SelectMasterTrack = function () {
-    Live.LiveSetView().set("selected_track", "id", Live.Env().masterTrack);
+    Live.LiveSetView().set("selected_track", "id", Live.Env().masterTrackId);
 };
 
 Live.SelectNextTrack = function () {
@@ -150,7 +150,7 @@ Live.SelectPreviousTrack = function () {
 Live.SetSelectedTrackIndex = function (index) {
     var visibleTrackCount = Live.GetVisibleTrackCount();
     if (index >= 0 && index < visibleTrackCount) {
-        Live.LiveSetView().set("selected_track", "id", Live.Env().visibleTracks[index]);
+        Live.LiveSetView().set("selected_track", "id", Live.Env().visibleTrackIds[index]);
     }
 };
 
@@ -160,14 +160,18 @@ Live.FireSelectedScene = function() {
     selectedScene.call("fire_as_selected");
 };
 
+Live.StopAllClips = function() {
+    Live.LiveSet().call("stop_all_clips");
+};
+
 Live.GetSceneCount = function() {
-    return Live.Env().scenes.length;
+    return Live.Env().sceneIds.length;
 };
 
 Live.GetSelectedSceneIndex = function() {
-    if (Live.Env().selectedScene) {
-        for (var i = 0; i < Live.Env().scenes.length; i++) {
-            if (Live.Env().scenes[i] == Live.Env().selectedScene) {
+    if (Live.Env().selectedSceneId) {
+        for (var i = 0; i < Live.Env().sceneIds.length; i++) {
+            if (Live.Env().sceneIds[i] == Live.Env().selectedSceneId) {
                 return i;
             }
         }
@@ -204,7 +208,7 @@ Live.SelectPreviousScene = function() {
 Live.SetSelectedSceneIndex = function(index) {
     var sceneCount = Live.GetSceneCount();
     if (index >= 0 && index < sceneCount) {
-        Live.LiveSetView().set("selected_scene", "id", Live.Env().scenes[index]);
+        Live.LiveSetView().set("selected_scene", "id", Live.Env().sceneIds[index]);
     }
 };
 
@@ -214,9 +218,19 @@ Live.FireSelectedClip = function() {
     if (selectedTrackIndex < 0) {
         Live.FireSelectedScene();
     } else {
-        var path = "live_set visible_tracks " + selectedTrackIndex + " clip_slots " + selectedSceneIndex;
-        var clip = new LiveAPI(path);
+        var clip = new LiveAPI("live_set visible_tracks " + selectedTrackIndex + " clip_slots " + selectedSceneIndex);
         clip.call("fire");
+    }    
+};
+
+Live.StopSelectedClip = function() {
+    var selectedSceneIndex = Live.GetSelectedSceneIndex();
+    var selectedTrackIndex = Live.GetSelectedTrackIndex();
+    if (selectedTrackIndex < 0) {
+        Live.StopAllClips();
+    } else {
+        var clip = new LiveAPI("live_set visible_tracks " + selectedTrackIndex + " clip_slots " + selectedSceneIndex);
+        clip.call("stop");
     }    
 };
 
@@ -244,4 +258,8 @@ function previousScene() {
 
 function fire() {
     Live.FireSelectedClip();
+}
+
+function stop() {
+    Live.StopSelectedClip();
 }
